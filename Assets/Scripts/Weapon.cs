@@ -8,20 +8,27 @@ abstract public class Weapon : MonoBehaviour
     public float reloadTime;
     public int maxAmmo;
     public int currentAmmo;
+    public int magCurrentAmmo;
+    public int magMaxAmmo;
     public float spreadAngle; // Разброс пуль
 
+    float timeSinceLastAttack;
+
     protected bool isReloading = false;
+    bool CanAttack() => !isReloading && timeSinceLastAttack > 1f / (fireRate / 60f);
 
     private void Start()
     {
         currentAmmo = maxAmmo;
+        magCurrentAmmo = magMaxAmmo;
     }
 
     public virtual void Attack(Transform target = null)
     {
-        if (isReloading || currentAmmo <= 0) return;
+        if (magCurrentAmmo <= 0) return;
+        if (!CanAttack()) return;
 
-        currentAmmo--;
+        magCurrentAmmo--;
 
         // Логика выстрела (Raycast / Projectile)
         if (target != null)

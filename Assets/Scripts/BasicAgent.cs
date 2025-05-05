@@ -250,18 +250,19 @@ public class BasicAgent : Agent, ITeam
     {
         Vector3 rotationVector = transform.rotation.eulerAngles;
 
-        float pitchChange = x;
+        float pitchChange = x - 1;
         smoothPitchChange = Mathf.MoveTowards(smoothPitchChange, pitchChange, 2f * Time.fixedDeltaTime);
         float pitch = rotationVector.x + smoothPitchChange * Time.fixedDeltaTime * rotationSpeed;
         if (pitch > 180f) pitch -= 360f;
         pitch = Mathf.Clamp(pitch, -80f, 80f);
 
-        float yawChange = y;
+        float yawChange = y - 1;
         smoothYawChange = Mathf.MoveTowards(smoothYawChange, yawChange, 2f * Time.fixedDeltaTime);
         float yaw = rotationVector.y + smoothYawChange * Time.fixedDeltaTime * rotationSpeed;
 
         transform.rotation = Quaternion.Euler(0, yaw, 0);
-        pointOfView.rotation = Quaternion.Euler(pitch, 0, 0);
+        //pointOfView.localRotation = Quaternion.Euler(pitch, 0, 0);
+        fieldOfView.ChangeLocalX(pitch);
     }
 
     public void Attack(int value)
@@ -381,11 +382,11 @@ public class BasicAgent : Agent, ITeam
     {
         var discreteActions = actionsOut.DiscreteActions;
 
-        if (Input.GetKey(KeyCode.Q))
+        if (Input.GetKey(KeyCode.Q)) // случайное место точки назначения
         {
             discreteActions[0] = UnityEngine.Random.Range(0, 199);
             discreteActions[1] = UnityEngine.Random.Range(0, 199);
-            discreteActions[2] = 0;
+            discreteActions[2] = 1;
             discreteActions[3] = 1;
             discreteActions[4] = 0;
             discreteActions[5] = 0;
@@ -396,8 +397,68 @@ public class BasicAgent : Agent, ITeam
         {
             discreteActions[0] = (int)walkPoint.x;
             discreteActions[0] = (int)walkPoint.y;
+            discreteActions[2] = 1;
+            discreteActions[3] = 1;
+            discreteActions[4] = 0;
+            discreteActions[5] = 0;
+            discreteActions[6] = 0;
+        }
+        if (Input.GetKey(KeyCode.W)) 
+        {
+            discreteActions[0] = (int)walkPoint.x;
+            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[2] = 1;
+            discreteActions[3] = 1;
+            discreteActions[4] = 1; // Атаковать
+            discreteActions[5] = 0;
+            discreteActions[6] = 0;
+        }
+        if (Input.GetKey(KeyCode.R))
+        {
+            discreteActions[0] = (int)walkPoint.x;
+            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[2] = 1;
+            discreteActions[3] = 1;
+            discreteActions[4] = 0;
+            discreteActions[5] = 1; // Перезарядка
+            discreteActions[6] = 0;
+        }
+        if (Input.GetKey(KeyCode.UpArrow))
+        {
+            discreteActions[0] = (int)walkPoint.x;
+            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[2] = 2;
+            discreteActions[3] = 1;
+            discreteActions[4] = 0;
+            discreteActions[5] = 0;
+            discreteActions[6] = 0;
+        }
+        if (Input.GetKey(KeyCode.DownArrow))
+        {
+            discreteActions[0] = (int)walkPoint.x;
+            discreteActions[0] = (int)walkPoint.y;
             discreteActions[2] = 0;
             discreteActions[3] = 1;
+            discreteActions[4] = 0;
+            discreteActions[5] = 0;
+            discreteActions[6] = 0;
+        }
+        if ((Input.GetKey(KeyCode.LeftArrow)))
+        {
+            discreteActions[0] = (int)walkPoint.x;
+            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[2] = 1;
+            discreteActions[3] = 0;
+            discreteActions[4] = 0;
+            discreteActions[5] = 0;
+            discreteActions[6] = 0;
+        }
+        if ((Input.GetKey(KeyCode.RightArrow)))
+        {
+            discreteActions[0] = (int)walkPoint.x;
+            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[2] = 1;
+            discreteActions[3] = 2;
             discreteActions[4] = 0;
             discreteActions[5] = 0;
             discreteActions[6] = 0;
@@ -460,6 +521,7 @@ public class BasicAgent : Agent, ITeam
     {
         if (isDead) return;
 
+        Debug.DrawRay(fieldOfView.transform.position, Quaternion.Inverse(fieldOfView.transform.localRotation) * Vector3.forward * fieldOfView.viewRadius, Color.yellow);
         RequestDecision();
 
         if (fieldOfView.visibleTargets.Count > 0)
