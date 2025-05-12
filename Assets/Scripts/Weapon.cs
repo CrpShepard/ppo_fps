@@ -11,37 +11,41 @@ abstract public class Weapon : MonoBehaviour
     public int magCurrentAmmo;
     public int magMaxAmmo;
     public float spreadAngle; // Разброс пуль
+    public float attackDistance;
 
-    float timeSinceLastAttack;
+    public float timeSinceLastAttack;
 
-    protected bool isReloading = false;
-    bool CanAttack() => !isReloading && timeSinceLastAttack > 1f / (fireRate / 60f);
+    public LayerMask targetLayer;
 
-    private void Start()
-    {
-        currentAmmo = maxAmmo;
-        magCurrentAmmo = magMaxAmmo;
+    bool isReloading = false;
+    public bool CanAttack() { 
+        if (!isReloading && timeSinceLastAttack > 1f / (fireRate / 60f)) return true;
+        return false;
     }
 
-    public virtual void Attack(Transform target = null)
+    public virtual void Attack(out ITarget hitTarget, Vector3 pos, Vector3 dir)
     {
+        hitTarget = null;
         if (magCurrentAmmo <= 0) return;
         if (!CanAttack()) return;
 
         magCurrentAmmo--;
 
-        // Логика выстрела (Raycast / Projectile)
-        if (target != null)
+        // Логика выстрела (Raycast)
+        Vector3 direction = dir;
+        direction = ApplySpread(direction); // Добавляем разброс
+        
+        Debug.DrawLine(pos, direction, Color.magenta, 5f);
+        if (Physics.Raycast(pos, direction, out RaycastHit hit, attackDistance, targetLayer))
         {
-            Vector3 direction = (target.position - transform.position).normalized;
-            direction = ApplySpread(direction); // Добавляем разброс
-            FireProjectile(direction);
+            if (hit.transform.TryGetComponent<ITarget>(out ITarget enemy)) { hitTarget = enemy; }
         }
 
         if (currentAmmo <= 0)
         {
             //StartCoroutine(Reload());
         }
+        timeSinceLastAttack = 0f;
     }
 
     protected virtual Vector3 ApplySpread(Vector3 direction)
@@ -51,13 +55,26 @@ abstract public class Weapon : MonoBehaviour
         return Quaternion.Euler(spreadX, spreadY, 0) * direction;
     }
 
-    protected abstract void FireProjectile(Vector3 direction);
-
     public virtual IEnumerator Reload()
     {
         isReloading = true;
         yield return new WaitForSeconds(reloadTime);
-        currentAmmo = maxAmmo;
+
+        int ammoNeeded = magMaxAmmo - magCurrentAmmo;
+        int ammoToReload = Mathf.Min(ammoNeeded, currentAmmo);
+        currentAmmo -= ammoToReload;
+        magCurrentAmmo = ammoToReload;
         isReloading = false;
+    }
+
+    private void Awake()
+    {
+        currentAmmo = maxAmmo;
+        magCurrentAmmo = magMaxAmmo;
+    }
+
+    private void Update()
+    {
+        timeSinceLastAttack += Time.deltaTime;
     }
 }

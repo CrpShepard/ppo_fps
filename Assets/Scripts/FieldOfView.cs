@@ -29,7 +29,7 @@ public class FieldOfView : MonoBehaviour
         viewMesh.name = "View Mesh";
         viewMeshFilter.mesh = viewMesh;
 
-        StartCoroutine(nameof(FindTargetsWithDelay), .2f);
+        StartCoroutine(nameof(FindTargetsWithDelay), .05f);
     }
 
     private void Update()
@@ -75,7 +75,8 @@ public class FieldOfView : MonoBehaviour
                 float dstToTarget = Vector3.Distance(transform.position, target.position);
                 if (!Physics.Raycast(transform.position, dirToTarget, dstToTarget, obstacleMask))
                 {
-                    visibleTargets.Add(target);
+                    if (!target.gameObject.GetComponent<ITarget>().isDead)
+                        visibleTargets.Add(target);
                 }
             }
         }

@@ -11,7 +11,7 @@ using Unity.MLAgents.Sensors;
 using UnityEngine;
 using UnityEngine.AI;
 
-public class BasicAgent : Agent, ITeam
+public class BasicAgent : Agent, ITarget
 {
     [Header("Scoreboard")]
     [SerializeField] protected byte team;
@@ -35,6 +35,9 @@ public class BasicAgent : Agent, ITeam
     Transform pointOfView;
     protected Transform target;
     FieldOfView fieldOfView;
+    Vector3 fovPos;
+    Vector3 fovForward;
+
     BehaviorParameters behaviorParameters;
 
     // Navigation
@@ -59,25 +62,29 @@ public class BasicAgent : Agent, ITeam
     // Reward related states
     int R_EmptyGunFire = 1;
 
-    byte ITeam.team {
+    byte ITarget.team {
         get => team;
         set => team = value;
     }
 
-    int ITeam.score { get => score; set => score = value; }
-    int ITeam.death { get => death; }
+    int ITarget.score { get => score; set => score = value; }
+    int ITarget.death { get => death; }
 
-    bool ITeam.IsEnemy(ITeam target)
+    bool ITarget.IsEnemy(ITarget target)
     {
         if (target.team == team) return false;
         else return true;
     }
 
-    void ITeam.AddScore()
+    void ITarget.AddScore()
     {
         score++;
         AddReward(3f);
     }
+
+    void ITarget.TakeDamage(float damage, ITarget source) { TakeDamage(damage, source); }
+
+    bool ITarget.isDead { get => isDead; }
 
     public virtual void GetHealth(float health)
     {
@@ -86,7 +93,7 @@ public class BasicAgent : Agent, ITeam
         AddReward(0.05f);
     }
 
-    public virtual void TakeDamage(float damage, ITeam source)
+    public virtual void TakeDamage(float damage, ITarget source)
     {
         currentHealth -= damage;
         AddReward(-0.1f);
@@ -101,7 +108,7 @@ public class BasicAgent : Agent, ITeam
         }
     }
 
-    protected virtual void Die(ITeam source)
+    protected virtual void Die(ITarget source)
     {
         AddReward(-2f);
 
@@ -120,24 +127,9 @@ public class BasicAgent : Agent, ITeam
         #pragma warning restore CS0252 // ¬озможно, использовано непреднамеренное сравнение ссылок: дл€ левой стороны требуетс€ приведение
     }
 
-    /*
-    protected virtual bool CanSeeTarget()
+    protected void HitEnemy(ITarget target)
     {
-        RaycastHit hit;
-        Vector3 directionToPlayer = (target.position - transform.position).normalized;
-
-        if (Physics.Raycast(origin: transform.position, direction: directionToPlayer, out hit, maxDistance: maxSeeDistance))
-        {
-            return hit.transform == target;
-        }
-        return false;
-    }
-    */
-
-    protected void HitEnemy(Transform target)
-    {
-        BasicAgent enemy = target.gameObject.GetComponent<BasicAgent>();
-        enemy.TakeDamage(currentWeapon.damage, this);
+        target.TakeDamage(currentWeapon.damage, this);
         AddReward(0.15f);
     }
 
@@ -271,7 +263,12 @@ public class BasicAgent : Agent, ITeam
         {
             if (R_EmptyGunFire == 0) AddReward(-0.1f);
             if (currentWeapon.currentAmmo == 0) R_EmptyGunFire--;
-            currentWeapon.Attack();
+            
+            currentWeapon.Attack(out ITarget targetAttack, fovPos, fovForward);
+            if (targetAttack != null) 
+            {
+                HitEnemy(targetAttack);
+            }
         }
         // добавить штраф, если агент просто так атакует + если стараетс€ атаковать пустым оружием
     }
@@ -313,6 +310,7 @@ public class BasicAgent : Agent, ITeam
 
     // ======================================================================
     // ML-Agents functions BEGIN
+    // «амена void Start()
     public override void Initialize()
     {
         rigidbody = GetComponent<Rigidbody>();
@@ -396,7 +394,7 @@ public class BasicAgent : Agent, ITeam
         else
         {
             discreteActions[0] = (int)walkPoint.x;
-            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[1] = (int)walkPoint.z;
             discreteActions[2] = 1;
             discreteActions[3] = 1;
             discreteActions[4] = 0;
@@ -406,7 +404,7 @@ public class BasicAgent : Agent, ITeam
         if (Input.GetKey(KeyCode.W)) 
         {
             discreteActions[0] = (int)walkPoint.x;
-            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[1] = (int)walkPoint.z;
             discreteActions[2] = 1;
             discreteActions[3] = 1;
             discreteActions[4] = 1; // јтаковать
@@ -416,7 +414,7 @@ public class BasicAgent : Agent, ITeam
         if (Input.GetKey(KeyCode.R))
         {
             discreteActions[0] = (int)walkPoint.x;
-            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[1] = (int)walkPoint.z;
             discreteActions[2] = 1;
             discreteActions[3] = 1;
             discreteActions[4] = 0;
@@ -426,7 +424,7 @@ public class BasicAgent : Agent, ITeam
         if (Input.GetKey(KeyCode.UpArrow))
         {
             discreteActions[0] = (int)walkPoint.x;
-            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[1] = (int)walkPoint.z;
             discreteActions[2] = 2;
             discreteActions[3] = 1;
             discreteActions[4] = 0;
@@ -436,7 +434,7 @@ public class BasicAgent : Agent, ITeam
         if (Input.GetKey(KeyCode.DownArrow))
         {
             discreteActions[0] = (int)walkPoint.x;
-            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[1] = (int)walkPoint.z;
             discreteActions[2] = 0;
             discreteActions[3] = 1;
             discreteActions[4] = 0;
@@ -446,7 +444,7 @@ public class BasicAgent : Agent, ITeam
         if ((Input.GetKey(KeyCode.LeftArrow)))
         {
             discreteActions[0] = (int)walkPoint.x;
-            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[1] = (int)walkPoint.z;
             discreteActions[2] = 1;
             discreteActions[3] = 0;
             discreteActions[4] = 0;
@@ -456,7 +454,7 @@ public class BasicAgent : Agent, ITeam
         if ((Input.GetKey(KeyCode.RightArrow)))
         {
             discreteActions[0] = (int)walkPoint.x;
-            discreteActions[0] = (int)walkPoint.y;
+            discreteActions[1] = (int)walkPoint.z;
             discreteActions[2] = 1;
             discreteActions[3] = 2;
             discreteActions[4] = 0;
@@ -512,7 +510,7 @@ public class BasicAgent : Agent, ITeam
 
         viewCamera = Camera.main;
 
-        weapons = new List<Weapon>() { new W_Crowbar { } };
+        weapons = new List<Weapon>() { gameObject.AddComponent<W_Crowbar>() };
 
         currentWeapon = weapons[0];
     }
@@ -520,8 +518,10 @@ public class BasicAgent : Agent, ITeam
     protected void Update()
     {
         if (isDead) return;
+        fovPos = fieldOfView.transform.position;
+        fovForward = Quaternion.Inverse(fieldOfView.transform.localRotation) * Vector3.forward;
 
-        Debug.DrawRay(fieldOfView.transform.position, Quaternion.Inverse(fieldOfView.transform.localRotation) * Vector3.forward * fieldOfView.viewRadius, Color.yellow);
+        Debug.DrawRay(fovPos, fovForward * fieldOfView.viewRadius, Color.yellow);
         RequestDecision();
 
         if (fieldOfView.visibleTargets.Count > 0)
