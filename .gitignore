@@ -78,3 +78,6 @@ crashlytics-build.properties
 ml-agents/
 
 venv/
+/Assets/Resources/Audio
+/Assets/UnityTechnologies
+/Assets/Resources
