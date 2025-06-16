@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 416fc36b5e105bc459054897a3620c21, type: 3}
+  m_Name: GrenadeNotNearChase
+  m_EditorClassIdentifier: 
+  Decision: {fileID: 11400000, guid: 6fa393e50cc85f441a33e63c40078b92, type: 2}
+  TrueState: {fileID: 11400000, guid: 638a3f5c520e75a4e90bebfc78ca56ee, type: 2}
+  FalseState: {fileID: 11400000, guid: 66c7add412eb45d46a560304628e23a8, type: 2}

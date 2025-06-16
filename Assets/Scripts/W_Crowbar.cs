@@ -2,24 +2,32 @@ using UnityEngine;
 
 public class W_Crowbar : Weapon
 {
-    public override void Attack(out ITarget hitTarget, Vector3 pos, Vector3 dir)
+    public override void Attack(ITarget source, Vector3 position, Vector3 dir)
     {
-        hitTarget = null;
         if (!CanAttack()) return;
 
         // Логика выстрела (Raycast)
-        Debug.DrawRay(pos, dir * attackDistance, Color.magenta, 5f);
+        Debug.DrawRay(position, dir * attackDistance, Color.magenta, 2f);
         //Debug.Log("Crowbar Attack");
-        if (Physics.Raycast(pos, dir, out RaycastHit hit, attackDistance, targetLayer))
+        if (Physics.Raycast(position, dir, out RaycastHit hit, attackDistance))
         {
-            Debug.Log("Raycast hit the enemy");
-            if (hit.transform.TryGetComponent<ITarget>(out ITarget enemy)) { hitTarget = enemy; }
+            Debug.Log("Crowbar hits enemy");
+            if (hit.transform.TryGetComponent<ITarget>(out ITarget enemy)) 
+            {
+                enemy.TakeDamage(damage, source);
+                if (source is IAgent agent) { agent._AddReward(); }
+            }
+
+            Instantiate(ImpactParticle, hit.point, Quaternion.LookRotation(hit.normal));
         }
+
+        // TODO hitEffect
+
 
         timeSinceLastAttack = 0f;
     }
 
-    private void Awake()
+    public override void Awake()
     {
         damage = 25f;
         fireRate = 150f;
@@ -30,8 +38,14 @@ public class W_Crowbar : Weapon
         magMaxAmmo = 1;
         magCurrentAmmo = 1;
 
-        targetLayer = LayerMask.GetMask("Target");
+        isReloadable = false;
+
+        //targetLayer = LayerMask.GetMask("Target");
+        //obstacleLayer = LayerMask.GetMask("Obstacle");
+
+        weaponPrefab = Resources.Load<GameObject>("Prefabs/Crowbar");
 
         timeSinceLastAttack = 0f;
+        equipTime = 0.7f;
     }
 }

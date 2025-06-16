@@ -4,17 +4,20 @@ using UnityEngine;
 
 public class FieldOfView : MonoBehaviour
 {
-    public float localX = 0f;
+    [HideInInspector]
+    public ITarget self;
 
+    public float localX = 0f;
     public float viewRadius;
+
     [Range(0, 360)]
     public float viewAngle;
 
-    public LayerMask targetMask;
-    public LayerMask obstacleMask;
+    public LayerMask targetMask, obstacleMask;
 
     [HideInInspector]
     public List<Transform> visibleTargets = new List<Transform>();
+    public List<Transform> visibleGrenades = new List<Transform>();
 
     public float meshResolution;
     public int edgeResolveIterations;
@@ -22,24 +25,6 @@ public class FieldOfView : MonoBehaviour
 
     public MeshFilter viewMeshFilter;
     Mesh viewMesh;
-
-    void Start()
-    {
-        viewMesh = new Mesh();
-        viewMesh.name = "View Mesh";
-        viewMeshFilter.mesh = viewMesh;
-
-        StartCoroutine(nameof(FindTargetsWithDelay), .05f);
-    }
-
-    private void Update()
-    {
-        float y = transform.rotation.y;
-        
-        transform.rotation = Quaternion.Euler(localX, y, 0f);
-
-
-    }
 
     public void ChangeLocalX(float x)
     {
@@ -56,28 +41,42 @@ public class FieldOfView : MonoBehaviour
         }
     }
 
-    void LateUpdate()
-    {
-        DrawFieldOfView();
-    }
-
     void FindVisibleTargets()
     {
         visibleTargets.Clear();
+        visibleGrenades.Clear();
         Collider[] targetsInViewRadius = Physics.OverlapSphere(transform.position, viewRadius, targetMask);
+        Collider[] grenadesInViewRadius = Physics.OverlapSphere(transform.position, 12f, LayerMask.GetMask("Grenade"));
 
         for (int i = 0; i < targetsInViewRadius.Length; i++)
         {
             Transform target = targetsInViewRadius[i].transform;
-            Vector3 dirToTarget = (target.position - transform.position).normalized;
-            if (Vector3.Angle(transform.forward, dirToTarget) < viewAngle / 2)
+            ITarget visibleTarget = target.GetComponentInParent<ITarget>();
+
+            if (visibleTarget != self && visibleTarget.team != self.team)
             {
-                float dstToTarget = Vector3.Distance(transform.position, target.position);
-                if (!Physics.Raycast(transform.position, dirToTarget, dstToTarget, obstacleMask))
+                Vector3 dirToTarget = (target.position - transform.position).normalized;
+                if (Vector3.Angle(transform.forward, dirToTarget) < viewAngle / 2)
                 {
-                    if (!target.gameObject.GetComponent<ITarget>().isDead)
+                    float dstToTarget = Vector3.Distance(transform.position, target.position);
+                    if (!Physics.Raycast(transform.position, dirToTarget, dstToTarget, obstacleMask))
+                    {
+                        // (!target.gameObject.GetComponent<ITarget>().isDead)
                         visibleTargets.Add(target);
+                    }
                 }
+            }
+        }
+
+        for (int i = 0; i < grenadesInViewRadius.Length; i++)
+        {
+            Transform grenade = grenadesInViewRadius[i].transform;
+
+            Vector3 dirToGrenade = (grenade.position - transform.position).normalized;
+            float dstToGrenade = Vector3.Distance(transform.position, grenade.position);
+            if (!Physics.Raycast(transform.position, dirToGrenade, dstToGrenade, obstacleMask))
+            {
+                visibleGrenades.Add(grenade);
             }
         }
     }
@@ -173,9 +172,8 @@ public class FieldOfView : MonoBehaviour
     ViewCastInfo ViewCast(float globalAngle)
     {
         Vector3 dir = DirFromAngle(globalAngle, true);
-        RaycastHit hit;
 
-        if (Physics.Raycast(transform.position, dir, out hit, viewRadius, obstacleMask))
+        if (Physics.Raycast(transform.position, dir, out RaycastHit hit, viewRadius, obstacleMask))
         {
             return new ViewCastInfo(true, hit.point, hit.distance, globalAngle);
         }
@@ -221,5 +219,26 @@ public class FieldOfView : MonoBehaviour
             pointA = _pointA;
             pointB = _pointB;
         }
+    }
+
+    void Start()
+    {
+        viewMesh = new Mesh();
+        viewMesh.name = "View Mesh";
+        viewMeshFilter.mesh = viewMesh;
+
+        StartCoroutine(FindTargetsWithDelay(0.05f));
+    }
+
+    private void Update()
+    {
+        float y = transform.rotation.y;
+
+        transform.rotation = Quaternion.Euler(localX, y, 0f);
+    }
+
+    void LateUpdate()
+    {
+        DrawFieldOfView();
     }
 }
