@@ -1,0 +1,47 @@
+{
+    "MLEnemy2": {
+        "checkpoints": [
+            {
+                "steps": 499943,
+                "file_path": "results\\train_2\\MLEnemy2\\MLEnemy2-499943.onnx",
+                "reward": -22.59702433925122,
+                "creation_time": 1750186988.1290889,
+                "auxillary_file_paths": [
+                    "results\\train_2\\MLEnemy2\\MLEnemy2-499943.pt"
+                ]
+            },
+            {
+                "steps": 999960,
+                "file_path": "results\\train_2\\MLEnemy2\\MLEnemy2-999960.onnx",
+                "reward": -63.18079294397363,
+                "creation_time": 1750187871.0601547,
+                "auxillary_file_paths": [
+                    "results\\train_2\\MLEnemy2\\MLEnemy2-999960.pt"
+                ]
+            },
+            {
+                "steps": 1000024,
+                "file_path": "results\\train_2\\MLEnemy2\\MLEnemy2-1000024.onnx",
+                "reward": -63.18079294397363,
+                "creation_time": 1750187871.2396047,
+                "auxillary_file_paths": [
+                    "results\\train_2\\MLEnemy2\\MLEnemy2-1000024.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 1000024,
+            "file_path": "results\\train_2\\MLEnemy2.onnx",
+            "reward": -63.18079294397363,
+            "creation_time": 1750187871.2396047,
+            "auxillary_file_paths": [
+                "results\\train_2\\MLEnemy2\\MLEnemy2-1000024.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.2.2+cu121"
+    }
+}

@@ -49,6 +49,7 @@ abstract public class Weapon : MonoBehaviour
     {
         if (magCurrentAmmo <= 0)
         {
+            if (source is IAgent agent) { agent._AddReward(-0.01f); }
             // звук пустого оружия
         }
 
@@ -62,11 +63,13 @@ abstract public class Weapon : MonoBehaviour
         Debug.DrawRay(position, direction * attackDistance, Color.magenta, 2f);
         if (Physics.Raycast(position, direction, out RaycastHit hit, attackDistance))
         {
-            if (hit.transform.TryGetComponent<ITarget>(out ITarget enemy)) 
-            { 
+            if (hit.transform.TryGetComponent<ITarget>(out ITarget enemy))
+            {
                 enemy.TakeDamage(damage, source);
-                if (source is IAgent agent) { agent._AddReward(); }
+                if (source is IAgent agent) { agent._AddReward(0.1f); }
             }
+            else if (source is IAgent agent) { agent._AddReward(-0.01f); }
+
             TrailRenderer trail = Instantiate(bulletTrail, BulletSpawnPoint.position, Quaternion.identity);
             StartCoroutine(SpawnTrail(trail, hit));
         }

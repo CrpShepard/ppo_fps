@@ -25,7 +25,7 @@ public class Player : MonoBehaviour, ITarget
 
     [Header("States")]
     public bool isDead { get; set; } = false;
-    [SerializeField] bool isInvisible = false;
+    //[SerializeField] bool isInvisible = false;
     [SerializeField] bool godMode = false;
     public bool canMove;
 

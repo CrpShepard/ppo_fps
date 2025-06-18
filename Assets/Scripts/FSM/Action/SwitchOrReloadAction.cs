@@ -29,7 +29,7 @@ public class SwitchOrReloadAction : FSMAction
                 case BaseState.State.Patrol:
                     bool changedWeaponForReload = false;
 
-                    if (currentWeapon.isReloadable && currentWeapon.currentAmmo > 0 && currentWeapon.magCurrentAmmo < currentWeapon.magMaxAmmo)
+                    if (currentWeapon && currentWeapon.isReloadable && currentWeapon.currentAmmo > 0 && currentWeapon.magCurrentAmmo < currentWeapon.magMaxAmmo )
                     {
                         stateMachine.Reload();
                         break;
@@ -50,7 +50,7 @@ public class SwitchOrReloadAction : FSMAction
                         otherWeapon = weapons.Where(weapon => weapon != currentWeapon);
 
                         weaponRifle = otherWeapon.OfType<W_Rifle>().FirstOrDefault();
-                        if (weaponRifle != null && 
+                        if (currentWeapon && weaponRifle != null && 
                             ((weaponRifle.magCurrentAmmo / weaponRifle.magMaxAmmo >= 0.5f 
                             && currentWeapon is W_Pistol && currentWeapon.magCurrentAmmo / currentWeapon.magMaxAmmo <= 0.66f ) 
                             || (weaponRifle.magCurrentAmmo / weaponRifle.magMaxAmmo > 0f && (currentWeapon is W_Crowbar || currentWeapon is W_Grenade))) && !changeWeaponDelay)
@@ -60,7 +60,7 @@ public class SwitchOrReloadAction : FSMAction
                         }
 
                         weaponPistol = otherWeapon.OfType<W_Pistol>().FirstOrDefault();
-                        if (weaponPistol != null &&
+                        if (currentWeapon && weaponPistol != null &&
                             ((weaponPistol.magCurrentAmmo / weaponPistol.magMaxAmmo > 0.66f
                             && currentWeapon is W_Rifle && currentWeapon.magCurrentAmmo / currentWeapon.magMaxAmmo <= 0.2f)
                             || (weaponPistol.magCurrentAmmo / weaponPistol.magMaxAmmo > 0f && (currentWeapon is W_Crowbar || currentWeapon is W_Grenade))) && !changeWeaponDelay)
@@ -70,7 +70,7 @@ public class SwitchOrReloadAction : FSMAction
                         }
 
                         weaponGrenade = otherWeapon.OfType<W_Grenade>().FirstOrDefault();
-                        if (weaponGrenade != null &&
+                        if (currentWeapon && weaponGrenade != null &&
                             (weaponGrenade.magCurrentAmmo > 0
                             && (currentWeapon is W_Crowbar || currentWeapon.magCurrentAmmo <= 0)) && !changeWeaponDelay)
                         {
@@ -79,7 +79,7 @@ public class SwitchOrReloadAction : FSMAction
                         }
 
                         weaponCrowbar = otherWeapon.OfType<W_Crowbar>().FirstOrDefault();
-                        if (currentWeapon.magCurrentAmmo <= 0 && !changeWeaponDelay) // до сюда доходит, если вообще не осталось патронов или гранат
+                        if (currentWeapon && currentWeapon.magCurrentAmmo <= 0 && !changeWeaponDelay) // до сюда доходит, если вообще не осталось патронов или гранат
                         {
                             stateMachine.ChangeWeapon(weaponCrowbar);
                             break;
@@ -91,7 +91,7 @@ public class SwitchOrReloadAction : FSMAction
                     otherWeapon = weapons.Where(weapon => weapon != currentWeapon);
 
                     weaponRifle = otherWeapon.OfType<W_Rifle>().FirstOrDefault();
-                    if (weaponRifle != null &&
+                    if (currentWeapon && weaponRifle != null &&
                         ((weaponRifle.magCurrentAmmo / weaponRifle.magMaxAmmo >= 0.2f
                         && currentWeapon is W_Pistol && currentWeapon.magCurrentAmmo / currentWeapon.magMaxAmmo <= 0.2f)
                         || (weaponRifle.magCurrentAmmo / weaponRifle.magMaxAmmo > 0f && (currentWeapon is W_Crowbar || currentWeapon is W_Grenade))) && !changeWeaponDelay)
@@ -100,14 +100,14 @@ public class SwitchOrReloadAction : FSMAction
                         break;
                     }
 
-                    if (currentWeapon.isReloadable && currentWeapon.currentAmmo > 0 && currentWeapon.magCurrentAmmo / currentWeapon.magMaxAmmo <= 0.2f)
+                    if (currentWeapon && currentWeapon.isReloadable && currentWeapon.currentAmmo > 0 && currentWeapon.magCurrentAmmo / currentWeapon.magMaxAmmo <= 0.2f)
                     {
                         stateMachine.Reload();
                         break;
                     }
 
                     weaponPistol = otherWeapon.OfType<W_Pistol>().FirstOrDefault();
-                    if (weaponPistol != null &&
+                    if (currentWeapon && weaponPistol != null &&
                         ((weaponPistol.magCurrentAmmo / weaponPistol.magMaxAmmo >= 0.4f
                         && currentWeapon is W_Rifle && currentWeapon.magCurrentAmmo / currentWeapon.magMaxAmmo < 0.2f)
                         || (weaponPistol.magCurrentAmmo / weaponPistol.magMaxAmmo > 0f && (currentWeapon is W_Crowbar || currentWeapon is W_Grenade))) && !changeWeaponDelay)
@@ -117,7 +117,7 @@ public class SwitchOrReloadAction : FSMAction
                     }
 
                     weaponGrenade = otherWeapon.OfType<W_Grenade>().FirstOrDefault();
-                    if (weaponGrenade != null &&
+                    if (currentWeapon && weaponGrenade != null &&
                         (weaponGrenade.magCurrentAmmo > 0
                         && (currentWeapon is W_Crowbar || currentWeapon.magCurrentAmmo <= 0)) && !changeWeaponDelay)
                     {
@@ -126,7 +126,7 @@ public class SwitchOrReloadAction : FSMAction
                     }
 
                     weaponCrowbar = otherWeapon.OfType<W_Crowbar>().FirstOrDefault();
-                    if (currentWeapon.magCurrentAmmo <= 0 && !changeWeaponDelay) // до сюда доходит, если вообще не осталось патронов или гранат
+                    if (currentWeapon && currentWeapon.magCurrentAmmo <= 0 && !changeWeaponDelay) // до сюда доходит, если вообще не осталось патронов или гранат
                     {
                         stateMachine.ChangeWeapon(weaponCrowbar);
                         break;
@@ -136,7 +136,7 @@ public class SwitchOrReloadAction : FSMAction
                     otherWeapon = weapons.Where(weapon => weapon != currentWeapon);
 
                     weaponRifle = otherWeapon.OfType<W_Rifle>().FirstOrDefault();
-                    if (weaponRifle != null &&
+                    if (currentWeapon && weaponRifle != null &&
                         ((weaponRifle.magCurrentAmmo / weaponRifle.magMaxAmmo > 0f
                         && currentWeapon is W_Pistol && currentWeapon.magCurrentAmmo / currentWeapon.magMaxAmmo <= 0f)
                         || (weaponRifle.magCurrentAmmo / weaponRifle.magMaxAmmo > 0f && (currentWeapon is W_Crowbar || currentWeapon is W_Grenade))) && !changeWeaponDelay)
@@ -146,7 +146,7 @@ public class SwitchOrReloadAction : FSMAction
                     }
 
                     weaponPistol = otherWeapon.OfType<W_Pistol>().FirstOrDefault();
-                    if (weaponPistol != null &&
+                    if (currentWeapon && weaponPistol != null &&
                         ((weaponPistol.magCurrentAmmo / weaponPistol.magMaxAmmo > 0f
                         && currentWeapon is W_Rifle && currentWeapon.magCurrentAmmo / currentWeapon.magMaxAmmo <= 0f)
                         || (weaponPistol.magCurrentAmmo / weaponPistol.magMaxAmmo > 0f && (currentWeapon is W_Crowbar || currentWeapon is W_Grenade))) && !changeWeaponDelay)
@@ -156,7 +156,7 @@ public class SwitchOrReloadAction : FSMAction
                     }
 
                     weaponGrenade = otherWeapon.OfType<W_Grenade>().FirstOrDefault();
-                    if (weaponGrenade != null &&
+                    if (currentWeapon && weaponGrenade != null &&
                         weaponGrenade.magCurrentAmmo > 0
                         && (currentWeapon is W_Crowbar || currentWeapon.magCurrentAmmo <= 0)
                         && stateMachine.currentTarget && stateMachine.distanceToTarget > 6f && !changeWeaponDelay)
@@ -165,7 +165,7 @@ public class SwitchOrReloadAction : FSMAction
                         break;
                     }
 
-                    if (currentWeapon.isReloadable && currentWeapon.currentAmmo > 0 && currentWeapon.magCurrentAmmo / currentWeapon.magMaxAmmo <= 0f
+                    if (currentWeapon && currentWeapon.isReloadable && currentWeapon.currentAmmo > 0 && currentWeapon.magCurrentAmmo / currentWeapon.magMaxAmmo <= 0f
                         && (!stateMachine.currentTarget || (stateMachine.currentTarget && stateMachine.distanceToTarget >= 30f)) && !changeWeaponDelay)
                     {
                         stateMachine.Reload();
@@ -173,7 +173,7 @@ public class SwitchOrReloadAction : FSMAction
                     }
 
                     weaponCrowbar = otherWeapon.OfType<W_Crowbar>().FirstOrDefault();
-                    if (currentWeapon.magCurrentAmmo <= 0 && !changeWeaponDelay) // до сюда доходит, если вообще не осталось патронов или гранат
+                    if (currentWeapon && currentWeapon.magCurrentAmmo <= 0 && !changeWeaponDelay) // до сюда доходит, если вообще не осталось патронов или гранат
                     {
                         stateMachine.ChangeWeapon(weaponCrowbar);
                         break;

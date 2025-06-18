@@ -192,15 +192,15 @@ public class FSMEnemy : MonoBehaviour, ITarget
         {
             float x = UnityEngine.Random.Range(-49, 49) + UnityEngine.Random.Range(-1, 1) / 2;
             float z = UnityEngine.Random.Range(-49, 49) + UnityEngine.Random.Range(-1, 1) / 2;
-            Vector3 newWalkPoint = new Vector3(x, 0, z);
+            Vector3 newWalkPoint = new Vector3(x, 0, z) + levelEnv.transform.position;
 
             if (levelEnv.IsWalkable(newWalkPoint)) { return newWalkPoint; }
 
             safeTries--;
         }
 
-        Debug.Assert(false, "Couldn't find newWalkPoint");
-        return Vector3.zero;
+        //Debug.Assert(false, "Couldn't find newWalkPoint");
+        return Vector3.zero + levelEnv.transform.position;
     }
 
     public Vector3 RandomSearchPoint()
@@ -217,7 +217,7 @@ public class FSMEnemy : MonoBehaviour, ITarget
             safeTries--;
         }
 
-        Debug.Assert(false, "Couldn't find newWalkPoint");
+        //Debug.Assert(false, "Couldn't find newWalkPoint");
         return Vector3.zero;
     }
 
@@ -257,7 +257,7 @@ public class FSMEnemy : MonoBehaviour, ITarget
                 currentArmor -= armorDamage; // даже если имеется хотя бы 1 единица брони, то урон будет сниженным
                 currentHealth -= healthDamage;
 
-                Mathf.Clamp(currentArmor, 0f, maxArmor);
+                currentArmor = Mathf.Clamp(currentArmor, 0f, maxArmor);
             }
 
             else { currentHealth -= damage; }
@@ -411,7 +411,7 @@ public class FSMEnemy : MonoBehaviour, ITarget
     {
         UpdateVisibleTarget();
         fieldOfView.transform.rotation = transform.rotation;
-        Debug.DrawRay(fieldOfView.transform.position, fieldOfView.transform.forward * fieldOfView.viewRadius, Color.yellow);
+        Debug.DrawRay(fieldOfView.transform.position, fieldOfView.transform.forward * fieldOfView.viewRadius, Color.red);
 
         if (isSearching)
         {

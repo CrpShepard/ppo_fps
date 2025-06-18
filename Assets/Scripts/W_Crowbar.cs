@@ -11,11 +11,11 @@ public class W_Crowbar : Weapon
         //Debug.Log("Crowbar Attack");
         if (Physics.Raycast(position, dir, out RaycastHit hit, attackDistance))
         {
-            Debug.Log("Crowbar hits enemy");
+            //Debug.Log("Crowbar hits enemy");
             if (hit.transform.TryGetComponent<ITarget>(out ITarget enemy)) 
             {
                 enemy.TakeDamage(damage, source);
-                if (source is IAgent agent) { agent._AddReward(); }
+                if (source is IAgent agent) { agent._AddReward(0.1f); }
             }
 
             Instantiate(ImpactParticle, hit.point, Quaternion.LookRotation(hit.normal));

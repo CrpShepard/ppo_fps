@@ -9,6 +9,7 @@ public class WeaponHelper : MonoBehaviour
     public void ChangeWeapon(int index)
     {
         Weapon neededWeapon = null;
+        var currentWeapon = target.currentWeapon;
 
         switch (index)
         {
@@ -18,6 +19,11 @@ public class WeaponHelper : MonoBehaviour
                 {
                     target.currentWeapon = neededWeapon;
                     target.currentWeapon.Equip(target);
+
+                    if (target is IAgent agent)
+                    {
+                        if (currentWeapon && currentWeapon.magCurrentAmmo <= 0f || (agent.distanceToTarget > -1f && agent.distanceToTarget < 10f)) agent._AddReward(0.05f);
+                    }
                 }
                 break;
             case 2:
@@ -26,6 +32,11 @@ public class WeaponHelper : MonoBehaviour
                 {
                     target.currentWeapon = neededWeapon;
                     target.currentWeapon.Equip(target);
+
+                    if (target is IAgent agent)
+                    {
+                        if (currentWeapon.magCurrentAmmo <= 0f || agent.distanceToTarget > 10f) agent._AddReward(0.05f);
+                    }
                 }
                 break;
             case 3:
@@ -34,6 +45,11 @@ public class WeaponHelper : MonoBehaviour
                 {
                     target.currentWeapon = neededWeapon;
                     target.currentWeapon.Equip(target);
+
+                    if (target is IAgent agent)
+                    {
+                        if (currentWeapon.magCurrentAmmo <= 0f || agent.distanceToTarget > 10f) agent._AddReward(0.05f);
+                    }
                 }
                 break;
             case 4:
@@ -42,6 +58,11 @@ public class WeaponHelper : MonoBehaviour
                 {
                     target.currentWeapon = neededWeapon;
                     target.currentWeapon.Equip(target);
+
+                    if (target is IAgent agent)
+                    {
+                        if (currentWeapon.magCurrentAmmo <= 0f || agent.distanceToTarget > 10f) agent._AddReward(0.05f);
+                    }
                 }
                 break;
         }
@@ -95,7 +116,17 @@ public class WeaponHelper : MonoBehaviour
 
     public void Reload()
     {
-        if (target.currentWeapon.isReloadable) { target.currentWeapon.Reload(); }
+        if (target.currentWeapon.isReloadable) 
+        {
+            var currentWeapon = target.currentWeapon;
+            if (currentWeapon.magCurrentAmmo / currentWeapon.magMaxAmmo < 0.5f && currentWeapon.currentAmmo > 0 && target is IAgent agent)
+            {
+                agent._AddReward(0.05f);
+            } 
+
+            target.currentWeapon.Reload();
+             
+        }
     }
 
     public bool AddWeaponBool(Weapon weapon)
@@ -134,6 +165,8 @@ public class WeaponHelper : MonoBehaviour
         if (!alreadyExists)
         {
             target.weapons.Add(weapon);
+
+            if (target is IAgent agent) { agent._AddReward(0.01f); }
         }
     }
 

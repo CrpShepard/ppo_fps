@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.AI;
 
 public class ItemHelper : MonoBehaviour
 {
@@ -244,6 +245,34 @@ public class ItemHelper : MonoBehaviour
     {
         // возвращается точка с предметом, у которой наибольший приоритет
         return ItemPriorityCalculate().Item1;
+    }
+
+    public bool GetPath(NavMeshPath path, Vector3 fromPos, Vector3 toPos, int passableMask)
+    {
+        path.ClearCorners();
+
+        if (NavMesh.CalculatePath(fromPos, toPos, passableMask, path) == false)
+            return false;
+
+        return true;
+    }
+
+    public float GetPathLength(NavMeshPath path, Vector3 fromPos, Vector3 toPos, int passableMask)
+    {
+        float lng = -1f;
+        if (GetPath(path, fromPos, toPos, passableMask))
+        {
+            if (path.status != NavMeshPathStatus.PathInvalid)
+            {
+                lng = 0f;
+                for (int i = 1; i < path.corners.Length; ++i)
+                {
+                    lng += Vector3.Distance(path.corners[i - 1], path.corners[i]);
+                }
+            }
+        }
+
+        return lng;
     }
 
 }

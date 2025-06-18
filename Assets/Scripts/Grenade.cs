@@ -87,12 +87,12 @@ public class Grenade : MonoBehaviour
                 
                 if (hit.transform.TryGetComponent<ITarget>(out ITarget enemy)) 
                 {
-                    Debug.Log("ITarget found");
+                    //Debug.Log("ITarget found");
                     // квадратичное затухание
                     float damage = baseDamage * (1 - Mathf.Sqrt(hit.distance / explosionRadius));
 
                     enemy.TakeDamage(damage, source);
-                    if (source is IAgent agent) { agent._AddReward(); }
+                    if (source is IAgent agent) { agent._AddReward(0.001f); }
                 }
             }
         }

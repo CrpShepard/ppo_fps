@@ -9,13 +9,6 @@ using UnityEngine.AI;
 public class LevelEnv : MonoBehaviour
 {
     // 0 - оружие, 1 - патроны, 2 - аптечки, 3 - брон€
-    /*
-    public List<Tuple<Vector3, Item.WeaponType>> weapons = new List<Tuple<Vector3, Item.WeaponType>>();
-    public List<Tuple<Vector3, Item.AmmoType>> ammoPacks = new List<Tuple<Vector3, Item.AmmoType>>();
-    public List<Vector3> healthPacks = new List<Vector3>();
-    public List<Vector3> armorPacks = new List<Vector3>();
-    */
-
     public List<Item> weapons = new List<Item>();
     public List<Item> ammoPacks = new List<Item>();
     public List<Item> healthPacks = new List<Item>();
@@ -37,6 +30,7 @@ public class LevelEnv : MonoBehaviour
         walkableGrid = new bool[gridWidth, gridHeight];
 
         Vector3 startPos = new Vector3(-gridSize.x / 2, 0, -gridSize.y / 2);
+        //Debug.Log(gameObject.name + " startPos: " + startPos);
 
         for (int x = 0; x < gridWidth; x++)
         {
@@ -53,7 +47,7 @@ public class LevelEnv : MonoBehaviour
     // ѕроверка, можно ли ходить в точке (в мировых координатах)
     public bool IsWalkable(Vector3 worldPosition)
     {
-        Vector3 localPos = worldPosition + new Vector3(gridSize.x / 2, 0, gridSize.y / 2);
+        Vector3 localPos = worldPosition - transform.position + new Vector3(gridSize.x / 2, 0, gridSize.y / 2);
         int x = Mathf.FloorToInt(localPos.x / cellSize);
         int z = Mathf.FloorToInt(localPos.z / cellSize);
         
@@ -67,27 +61,6 @@ public class LevelEnv : MonoBehaviour
     public void SetWaypoints()
     {
         Item[] items = gameObject.GetComponentsInChildren<Item>();
-
-        /*
-        for (int i = 0; i < items.Length; i++)
-        {
-            switch (items[i].type)
-            {
-                case Item.ItemType.Weapon:
-                    weapons.Add(new Tuple<Vector3, Item.WeaponType>(items[i].transform.position, items[i].weaponType));
-                    break;
-                case Item.ItemType.AmmoPack:
-                    ammoPacks.Add(new Tuple<Vector3, Item.AmmoType>(items[i].transform.position, items[i].ammoType));
-                    break;
-                case Item.ItemType.HealthPack:
-                    healthPacks.Add(items[i].transform.position);
-                    break;
-                case Item.ItemType.ArmorPack:
-                    armorPacks.Add(items[i].transform.position);
-                    break;
-            }
-        }
-        */
 
         for (int i = 0; i < items.Length; i++)
         {

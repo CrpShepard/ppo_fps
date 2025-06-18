@@ -1,9 +1,6 @@
-/*
-
-using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Unity.Mathematics;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Policies;
@@ -11,10 +8,11 @@ using Unity.MLAgents.Sensors;
 using UnityEngine;
 using UnityEngine.AI;
 
-public class BasicAgent : Agent, IAgent
+public class MLAgent : Agent, IAgent
 {
     [Header("Scoreboard")]
-    public byte team { get; set; }
+    public int _team;
+    public int team { get; set; }
     public int score { get; set; }
     public int death { get; set; }
 
@@ -25,110 +23,80 @@ public class BasicAgent : Agent, IAgent
     public float currentArmor { get; set; }
 
     [Header("Movement")]
-    [SerializeField] protected float speed;
-    [SerializeField] protected float rotationSpeed;
-    protected float smoothYawChange = 0f;
-    protected float smoothPitchChange = 0f;
-    [SerializeField] protected float maxPitchAngle = 80f;
-    
+    public float speed;
+    public float rotationSpeed;
+    float smoothYawChange = 0f;
+
     // Components
-    new Rigidbody rigidbody;
-    Camera viewCamera;
-    Transform pointOfView;
-    protected Transform target;
-    FieldOfView fieldOfView;
-    Vector3 fovPos;
-    Vector3 fovForward;
+    [HideInInspector]
+    public LevelEnv levelEnv { get; set; }
+
+    [HideInInspector]
+    public Rigidbody rb;
+
+    [HideInInspector]
+    public FieldOfView fieldOfView;
+
+    // Target
+    public Transform currentTarget;
+    public float distanceToTarget { get; set; } = -1f;
+    public LastKnownTargetTransform lastKnownTargetTransform;
+
+    Transform visibleGrenade;
+    float distanceToGrenade = -1f;
+
+    // Weapon
+    public List<Weapon> weapons { get; set; }
+    public Weapon currentWeapon { get; set; }
     public Transform weaponHolder { get; set; }
     WeaponHelper weaponHelper;
 
-    BehaviorParameters behaviorParameters;
-
     // Navigation
-    Vector3 walkPoint;
-    bool walkPointSet;
-    protected Vector3 lastKnownTargetPosition;
-    protected NavMeshAgent navAgent;
-    protected NavMeshPath path;
-    public LayerMask whatIsGround, whatIsTarget;
+    [HideInInspector]
+    public NavMeshAgent navMeshAgent;
+    public NavMeshPath path;
 
-    [Header("Combat")]
-    public List<Weapon> weapons { get; set; }
-    public Weapon currentWeapon { get; set; }
+    Vector3 walkPoint = Vector3.zero;
 
     [Header("States")]
     [SerializeField] protected bool isTrainingMode;
-    public bool isDead { get; set; } = false;
-    protected bool isAttacking = false;
-    protected bool isTargetVisible = false;
-    protected float maxSeeDistance;
+    public bool isDead { get; set; } = true;
 
+    public float maxSeeDistance = 150f;
 
+    // Item Related
+    [HideInInspector]
+    public ItemHelper itemHelper;
+    public Coroutine pickingCoroutine { get; set; }
+    public Vector3 weaponPointPistol { get; set; } = Vector3.zero;
+    public Vector3 weaponPointRifle { get; set; } = Vector3.zero;
+    public Vector3 weaponPointGrenade { get; set; } = Vector3.zero;
+    public Vector3 healthPackPoint { get; set; } = Vector3.zero;
+    public Vector3 armorPackPoint { get; set; } = Vector3.zero;
+    public Vector3 ammoPackPointPistol { get; set; } = Vector3.zero;
+    public Vector3 ammoPackPointRifle { get; set; } = Vector3.zero;
+    public Vector3 ammoPackPointGrenade { get; set; } = Vector3.zero;
 
-    // Reward related states
-    int R_EmptyGunFire = 1;
+    // Hiding
+    public Coroutine hidingCoroutine;
+    public Collider[] Colliders = new Collider[10];
+
+    [Header("ML-Agents")]
+    BehaviorParameters behaviorParameters;
 
     // =================================================================================================================
     // ITarget BEGIN
-    byte ITarget.team { get => team; set => team = value; }
-    int ITarget.score { get => score; set => score = value; }
-    int ITarget.death => death;
+    void ITarget.AddScore() { score++; AddReward(6f); }
 
-    float ITarget.currentHealth { get => currentHealth; set => currentHealth = value; }
-    float ITarget.maxHealth => maxHealth;
-    List<Weapon> ITarget.weapons { get => weapons; set => weapons = value; }
-    Weapon ITarget.currentWeapon { get => currentWeapon; set => currentWeapon = value; }
+    bool ITarget.IsEnemy(ITarget target) { return target.team != team; }
 
-    bool ITarget.isDead { get => isDead; set => isDead = value; }
-
-    void ITarget.AddScore() { score++; }
-    bool ITarget.IsEnemy(ITarget target) { return (target.team == team) ? false : true; }
-    void ITarget.TakeDamage(float damage, ITarget source) { TakeDamage(damage, source); }
-    bool ITarget.AddWeapon(Weapon weapon)
+    GameObject ITarget.EquipWeaponPrefab(GameObject prefab) { return weaponHelper.EquipWeaponPrefab(prefab); }
+    bool ITarget.AddWeapon(Weapon weapon) { return weaponHelper.AddWeaponBool(weapon); }
+    bool ITarget.AddAmmo(Item.AmmoType ammoType) 
     {
-        bool result = false;
-        bool alreadyExists = weapons.Any(w => w.GetType() == weapon.GetType());
-
-        if (alreadyExists) // само оружие уже есть, но можно подобрать в виде патронов
-        {
-            Weapon neededWeapon;
-            if (weapon is W_Pistol pistol)
-            {
-                neededWeapon = weapons.OfType<W_Pistol>().FirstOrDefault();
-                if (neededWeapon != null && neededWeapon.CheckAmmo()) { result = true; neededWeapon.AddAmmo(); }
-            }
-            else if (weapon is W_Rifle rifle)
-            {
-                neededWeapon = weapons.OfType<W_Rifle>().FirstOrDefault();
-                if (neededWeapon != null && neededWeapon.CheckAmmo()) { result = true; neededWeapon.AddAmmo(); }
-            }
-            else if (weapon is W_Grenade grenade)
-            {
-                neededWeapon = weapons.OfType<W_Grenade>().FirstOrDefault();
-                if (neededWeapon != null && neededWeapon.CheckAmmo()) { result = true; neededWeapon.AddAmmo(); }
-            }
-        }
-        else if (!alreadyExists) { AddWeapon(weapon); result = true; }
-
-        return result;
-    }
-    bool ITarget.AddAmmo(Item.AmmoType ammoType)
-    {
-        bool result = false;
-        Weapon neededWeapon;
-        switch (ammoType)
-        {
-            case Item.AmmoType.Pistol:
-                neededWeapon = weapons.OfType<W_Pistol>().FirstOrDefault();
-                if (neededWeapon != null && neededWeapon.CheckAmmo()) { result = true; neededWeapon.AddAmmo(); }
-                break;
-            case Item.AmmoType.Rifle:
-                neededWeapon = weapons.OfType<W_Rifle>().FirstOrDefault();
-                if (neededWeapon != null && neededWeapon.CheckAmmo()) { result = true; neededWeapon.AddAmmo(); }
-                break;
-        }
-
-        return result;
+        var result = weaponHelper.AddAmmo(ammoType);
+        if (result) AddReward(0.01f);
+        return result; 
     }
 
     bool ITarget.AddHealth()
@@ -153,27 +121,25 @@ public class BasicAgent : Agent, IAgent
         return result;
     }
 
-    GameObject ITarget.EquipWeaponPrefab(GameObject prefab)
-    {
-        foreach (Transform child in weaponHolder.transform)
-        {
-            Destroy(child.gameObject);
-        }
-
-        Quaternion originalRotation = prefab.transform.rotation;
-        Quaternion yRotation = Quaternion.Euler(0, transform.rotation.eulerAngles.y, 0);
-        Quaternion yRotation2 = Quaternion.Euler(0, -2.08f, 0);
-        Quaternion finalRotation = yRotation * originalRotation * yRotation2;
-
-        GameObject weaponObj = Instantiate(prefab, weaponHolder.position, finalRotation);
-        weaponObj.transform.parent = weaponHolder.transform;
-
-        return weaponObj;
-    }
+    void ITarget.TakeDamage(float damage, ITarget source) { TakeDamage(damage, source); }
 
     public GameObject GetGameObject() => gameObject;
     // ITarget END
     // =================================================================================================================
+
+    void IAgent._AddReward(float reward)
+    {
+        AddReward(reward);
+    }
+
+    void ChangeLayerMask(string layerMask)
+    {
+        gameObject.layer = LayerMask.NameToLayer(layerMask);
+        foreach (Transform child in transform)
+        {
+            child.gameObject.layer = LayerMask.NameToLayer(layerMask);
+        }
+    }
 
     public bool CheckHealth() { return (currentHealth < maxHealth) ? true : false; }
 
@@ -183,19 +149,19 @@ public class BasicAgent : Agent, IAgent
     {
         currentHealth += health;
         currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
-        AddReward(0.05f);
+        AddReward(0.2f);
     }
 
     public void AddArmor(float armor)
     {
         currentArmor += armor;
         currentArmor = Mathf.Clamp(currentArmor, 0f, maxArmor);
-        AddReward(0.01f);
+        AddReward(0.05f);
     }
 
     public void TakeDamage(float damage, ITarget source)
     {
-        AddReward(-0.02f);
+        AddReward(-0.005f);
         if (currentArmor > 0f)
         {
             float armorDamage = damage - damage / 5;
@@ -204,7 +170,7 @@ public class BasicAgent : Agent, IAgent
             currentArmor -= armorDamage; // даже если имеется хотя бы 1 единица брони, то урон будет сниженным
             currentHealth -= healthDamage;
 
-            Mathf.Clamp(currentArmor, 0f, maxArmor);
+            currentArmor = Mathf.Clamp(currentArmor, 0f, maxArmor);
         }
 
         else { currentHealth -= damage; }
@@ -215,224 +181,127 @@ public class BasicAgent : Agent, IAgent
         }
         else
         {
-            // Реакция на получение урона (например, анимация)
+#pragma warning disable CS0252
+            if (source != null && source != this)
+            {
+                lastKnownTargetTransform.position = source.GetGameObject().transform.position;
+            }
+#pragma warning restore CS0252
         }
     }
 
 
     protected virtual void Die(ITarget source)
     {
-        AddReward(-2f);
+        AddReward(-1f);
 
         isDead = true;
-        navAgent.isStopped = true;
-        
-        rigidbody.Sleep();
+        ChangeLayerMask("Ignore Raycast");
 
-        // Анимация смерти, выпадение лута и т.д.
+        //Debug.Log(gameObject.name + " has died!");
 
-        //Destroy(gameObject, 2f);
-        Debug.Log(gameObject.name + " has died!");
-
-        #pragma warning disable CS0252 // Возможно, использовано непреднамеренное сравнение ссылок: для левой стороны требуется приведение
+#pragma warning disable CS0252
         if (source != null && source != this) source.AddScore();
-        #pragma warning restore CS0252 // Возможно, использовано непреднамеренное сравнение ссылок: для левой стороны требуется приведение
+        if (source == this) score--;
+#pragma warning restore CS0252
+
+        if (isTrainingMode) EndEpisode();
+
+        StartCoroutine(Respawn());
     }
 
-    protected void HitEnemy(ITarget target)
-    {
-        target.TakeDamage(currentWeapon.damage, this);
-        AddReward(0.15f);
-    }
+    public void AddWeapon(Weapon weapon) { weaponHelper.AddWeapon(weapon); }
 
-    // Спавним агента в случайном играбельном месте на уровне
-    private void SpawnInRandomPosition()
-    {
-        bool safePositionFound = false;
-        int attemptsRemainig = 100; // избегаем вечного цикла
+    public void V_Attack(int value) { if (value == 1) Attack(); }
 
-        Vector3 potentialPosition = Vector3.zero;
-        Quaternion potentialRotation = new Quaternion();
+    public void Attack() { weaponHelper.Attack(fieldOfView.transform.position, fieldOfView.transform.forward); }
 
-        // цикл, в котором ищем позицию для спавна
-        while (!safePositionFound && attemptsRemainig > 0)
-        {
-            attemptsRemainig--;
+    public void V_Reload(int value) { if (value == 1) Reload(); }
 
-            //float radius = UnityEngine.Random.Range(2f, 20f);
-            //Quaternion direction = Quaternion.Euler(0f, UnityEngine.Random.Range(-180f, 180f), 0f);
-            float x = UnityEngine.Random.Range(-49, 49) + UnityEngine.Random.Range(-1, 1) / 2;
-            float z = UnityEngine.Random.Range(-49, 49) + UnityEngine.Random.Range(-1, 1) / 2;
+    public void Reload() { weaponHelper.Reload(); }
 
-            potentialPosition = new Vector3(x, 1, z);
+    public void ChangeWeapon(int value) { weaponHelper.ChangeWeapon(value); }
 
-            float yaw = UnityEngine.Random.Range(-180f, 180f);
-            potentialRotation = Quaternion.Euler(0f, yaw, 0f);
+    public void ChangeWeapon(Weapon weapon) { weaponHelper.ChangeWeapon(weapon); }
 
-            Collider[] colliders = Physics.OverlapSphere(potentialPosition, 0.5f);
-            safePositionFound = colliders.Length == 0;
-        }
-
-        if (attemptsRemainig == 0) Debug.Assert(safePositionFound, "Невозможно найти место для спавна!");
-        else
-        {
-            transform.position = potentialPosition;
-            transform.rotation = potentialRotation;
-        }
-    }
-
-    // Выбор цели (target) из нескольких противников
-    private void UpdateNearestTarget()
-    {
-        // потом дописать когда целей будет больше 1
-        //foreach (Transform target in )
-    }
-
-    // Если агент тронется триггера
-    private void OnTriggerEnter(Collider other)
-    {
-        // аптечка, оружие, патроны
-    }
-
-    // Если агент стоит внутри триггер зоны
-    private void OnTriggerStay(Collider other)
-    {
-
-    }
-
-    // Если агент коснется чего-то (не триггер)
-    private void OnCollisionEnter(Collision collision)
-    {
-
-    }
-
-    public void AddWeapon(Weapon weapon)
-    {
-        bool alreadyExists = weapons.Any(w => w.GetType() == weapon.GetType());
-
-        if (!alreadyExists) 
-        { 
-            weapons.Add(weapon);
-            AddReward(0.1f);
-        }
-    }
-
-    // ============================================================================================================
-    // действия через OnActionReceived BEGIN
     public void MoveToPos(int x, int z)
     {
-        //navAgent.isStopped = false;
         float newX = (float)(-50 + x * 0.5);
         float newZ = (float)(-50 + z * 0.5);
 
-        walkPoint = new Vector3(newX, 0, newZ);
-        /* TODO
-         поменять, когда среда возымеет больше 1 этажа
+        Vector3 newWalkPoint = new Vector3(newX, 0, newZ) + levelEnv.transform.position;
 
-        // узнаем нужную высоту выбранной точки
-        //float y = Terrain.activeTerrain.SampleHeight(walkPoint) + Terrain.activeTerrain.transform.position.y;
+        if (Vector3.Distance(newWalkPoint, walkPoint) > 10f && !currentTarget) { AddReward(-0.1f); }
 
-        //walkPoint = new Vector3(walkPoint.x, y, walkPoint.z);
-        */
+        walkPoint = newWalkPoint;
 
-        // если возможно дойти до точки
-        // TODO потом оптимизировать вызов этих двух проверок
-
-/*
-        if (navAgent.CalculatePath(walkPoint, path) && path.status == NavMeshPathStatus.PathComplete)
+        if (levelEnv.IsWalkable(walkPoint))
         {
-            navAgent.destination = walkPoint;
+            navMeshAgent.SetDestination(walkPoint);
+
+            Collider[] items = Physics.OverlapSphere(walkPoint, 0.5f);
+            bool item = false;
+
+            foreach (var _item in items)
+            {
+                if (_item.GetComponent<Item>() && _item.gameObject.activeSelf) { item = true; break; }
+            }
+
+            if (item)
+            {
+                AddReward(0.1f);
+            }
         }
         else
         {
-            AddReward(-0.1f);
+            AddReward(-0.01f);
         }
-
-        // добавить штраф, если агент пытается идти к квадрату, которой нет на карте
 
     }
 
-    public void RotateAgent(int x, int y)
+    public void RotateAgent(int y)
     {
         Vector3 rotationVector = transform.rotation.eulerAngles;
-
-        float pitchChange = x - 1;
-        smoothPitchChange = Mathf.MoveTowards(smoothPitchChange, pitchChange, 2f * Time.fixedDeltaTime);
-        float pitch = rotationVector.x + smoothPitchChange * Time.fixedDeltaTime * rotationSpeed;
-        if (pitch > 180f) pitch -= 360f;
-        pitch = Mathf.Clamp(pitch, -80f, 80f);
 
         float yawChange = y - 1;
         smoothYawChange = Mathf.MoveTowards(smoothYawChange, yawChange, 2f * Time.fixedDeltaTime);
         float yaw = rotationVector.y + smoothYawChange * Time.fixedDeltaTime * rotationSpeed;
 
         transform.rotation = Quaternion.Euler(0, yaw, 0);
-        //pointOfView.localRotation = Quaternion.Euler(pitch, 0, 0);
-        fieldOfView.ChangeLocalX(pitch);
     }
-
-    public void Attack(int value)
-    {
-        if (value == 1)
-        {
-            if (R_EmptyGunFire == 0) AddReward(-0.1f);
-            if (currentWeapon.currentAmmo == 0) R_EmptyGunFire--;
-            
-            currentWeapon.Attack(this, fovPos, fovForward);
-            
-        }
-        // добавить штраф, если агент просто так атакует + если старается атаковать пустым оружием
-    }
-   
-    public void Reload(int value)
-    {
-        if (value == 1)
-        {
-            if (currentWeapon.GetType() != typeof(W_Crowbar))
-            {
-                if (isTargetVisible && currentWeapon.currentAmmo / currentWeapon.maxAmmo > 0.33f) AddReward(-0.2f);
-            }
-
-            currentWeapon.CReload();
-        }
-        // добавить штраф, если агент просто так перезаряжается + если агент перезаряжается если в магазине еще осталось куча боезапаса
-    }
-
-    public void ChangeWeapon(int value)
-    {
-        switch (value)
-        {
-            // Монтировка
-            case 1:
-                Weapon neededWeapon = weapons.OfType<W_Crowbar>().FirstOrDefault();
-                if (neededWeapon && currentWeapon != neededWeapon)
-                {
-                    currentWeapon = neededWeapon;
-                    // TODO добавить задержку перед применением
-                }
-                break;
-        }
-
-        // добавить штраф, если агент просто так меняет оружие
-    }
-
-    // действия через OnActionReceived END
-    //===============================================================================================================================
 
     // ======================================================================
     // ML-Agents functions BEGIN
-    // Замена void Start()
     public override void Initialize()
     {
-        rigidbody = GetComponent<Rigidbody>();
-        pointOfView = this.transform.Find("PointOfView");
+        team = _team;
+
+        levelEnv = GetComponentInParent<LevelEnv>();
+        rb = GetComponent<Rigidbody>();
+
+        navMeshAgent = GetComponent<NavMeshAgent>();
+        navMeshAgent.speed = speed;
+        navMeshAgent.updateRotation = false;
+        navMeshAgent.angularSpeed = 0f;
+
+        path = new NavMeshPath();
+
+        fieldOfView = GetComponentInChildren<FieldOfView>();
+        fieldOfView.self = this;
+
+        weapons = new List<Weapon>() { };
+        weaponHelper = GetComponent<WeaponHelper>();
+        weaponHelper.SetInterface(this);
+        weaponHolder = gameObject.transform.Find("WeaponHolder");
+
+        itemHelper = GetComponent<ItemHelper>();
+        itemHelper.SetTarget(this);
+        pickingCoroutine = StartCoroutine(itemHelper.ItemPoint());
+
         behaviorParameters = GetComponent<BehaviorParameters>();
         behaviorParameters.TeamId = team;
 
-        // нет ограничения по длительности эпизода вне тренировочного режима
         if (!isTrainingMode) MaxStep = 0;
-
-
     }
 
     // Поступили аргументы от нейронной сети для действий
@@ -446,219 +315,247 @@ public class BasicAgent : Agent, IAgent
         MoveToPos(actions.DiscreteActions[0], actions.DiscreteActions[1]);
 
         // поворот агента
-        RotateAgent(actions.DiscreteActions[2], actions.DiscreteActions[3]);
+        RotateAgent(actions.DiscreteActions[2]);
 
         // атака агента
         // 0 - не атаковать, 1 - атаковать
-        Attack(actions.DiscreteActions[4]);
+        V_Attack(actions.DiscreteActions[3]);
 
         // перезарядка оружия
         // 0 - не перезаряжать, 1 - перезарядить
-        Reload(actions.DiscreteActions[5]);
+        V_Reload(actions.DiscreteActions[4]);
 
         // смена оружия
         // 0 - не менять, 1 - монтировка, 2 - пистолет, 3 - автомат, 4 - граната
-        ChangeWeapon(actions.DiscreteActions[6]);
+        ChangeWeapon(actions.DiscreteActions[5]);
     }
 
     // Прокидываем нужные параметры агента и переменные в нейронную сеть
     public override void CollectObservations(VectorSensor sensor)
     {
+        // Navigation
+        sensor.AddObservation(transform.position); // 3
+        sensor.AddObservation(transform.rotation.y); // 1
+        sensor.AddObservation(walkPoint); // 3
 
-        //sensor.AddObservation(transform.localRotation.normalized);
-        sensor.AddObservation(transform.localRotation.normalized.x);
-        sensor.AddObservation(transform.localRotation.normalized.y);
-        sensor.AddObservation(transform.localRotation.normalized.z);
+        // Health
+        sensor.AddObservation(currentHealth); // 1
+        sensor.AddObservation(currentArmor); // 1
 
-    /*
+        // Weapon
+        if (currentWeapon is W_Crowbar) sensor.AddObservation(1);
+        else if (currentWeapon is W_Pistol) sensor.AddObservation(2);
+        else if (currentWeapon is W_Rifle) sensor.AddObservation(3);
+        else if (currentWeapon is W_Grenade) sensor.AddObservation(4);
+        else sensor.AddObservation(0);
+        // 1
 
-        /*sensor.AddObservation(currentHealth);
-        sensor.AddObservation(speed);
-        sensor.AddObservation(currentWeapon);
-        sensor.AddObservation(maxSeeDistance);
-        sensor.AddObservation(target);
-        sensor.AddObservation(lastKnownTargetPosition);
-        sensor.AddObservation(isAttacking);
-        sensor.AddObservation(isDead);
-        sensor.AddObservation(isTargetVisible);
-        sensor.AddObservation(team);
-        */
-
-    //}
-
-/*
-
-    // Если Behavior Type поставлен на "Heuristic Only", то будет вызываться
-    // данная функция и значения будут высылаться в функцию OnActionReceived вместо нейронной сети
-    // !!! для rule-based ИИ или для игрока будет потом сделано
-    public override void Heuristic(in ActionBuffers actionsOut)
-    {
-        var discreteActions = actionsOut.DiscreteActions;
-
-        if (Input.GetKey(KeyCode.Q)) // случайное место точки назначения
+        if (weapons.Any(w => w.WeaponType == Item.WeaponType.Pistol)) 
         {
-            discreteActions[0] = UnityEngine.Random.Range(0, 199);
-            discreteActions[1] = UnityEngine.Random.Range(0, 199);
-            discreteActions[2] = 1;
-            discreteActions[3] = 1;
-            discreteActions[4] = 0;
-            discreteActions[5] = 0;
-            discreteActions[6] = 0;
-            Debug.Log("new walkPoint" + discreteActions[0] + " " + discreteActions[1]);
+            var pistol = weapons.Where(w => w.WeaponType == Item.WeaponType.Pistol).FirstOrDefault();
+            var pistolMagAmmo = pistol.magCurrentAmmo;
+            var pistolMagMaxAmmo = pistol.magMaxAmmo;
+            var pistolCurrenAmmo = pistol.currentAmmo;
+            var pistolMaxAmmo = pistol.maxAmmo;
+            sensor.AddObservation(2);
+            sensor.AddObservation(pistolMagAmmo / pistolMagMaxAmmo);
+            sensor.AddObservation(pistolCurrenAmmo / pistolMaxAmmo);
         }
         else
         {
-            discreteActions[0] = (int)walkPoint.x;
-            discreteActions[1] = (int)walkPoint.z;
-            discreteActions[2] = 1;
-            discreteActions[3] = 1;
-            discreteActions[4] = 0;
-            discreteActions[5] = 0;
-            discreteActions[6] = 0;
+            sensor.AddObservation(0);
+            sensor.AddObservation(0);
+            sensor.AddObservation(0);
         }
-        if (Input.GetKey(KeyCode.W)) 
+        // 3
+
+        if (weapons.Any(w => w.WeaponType == Item.WeaponType.Rifle))
         {
-            discreteActions[0] = (int)walkPoint.x;
-            discreteActions[1] = (int)walkPoint.z;
-            discreteActions[2] = 1;
-            discreteActions[3] = 1;
-            discreteActions[4] = 1; // Атаковать
-            discreteActions[5] = 0;
-            discreteActions[6] = 0;
+            var rifle = weapons.Where(w => w.WeaponType == Item.WeaponType.Rifle).FirstOrDefault();
+            var rifleMagAmmo = rifle.magCurrentAmmo;
+            var rifleMagMaxAmmo = rifle.magMaxAmmo;
+            var rifleCurrenAmmo = rifle.currentAmmo;
+            var rifleMaxAmmo = rifle.maxAmmo;
+            sensor.AddObservation(3);
+            sensor.AddObservation(rifleMagAmmo / rifleMagMaxAmmo);
+            sensor.AddObservation(rifleCurrenAmmo / rifleMaxAmmo);
         }
-        if (Input.GetKey(KeyCode.R))
+        else
         {
-            discreteActions[0] = (int)walkPoint.x;
-            discreteActions[1] = (int)walkPoint.z;
-            discreteActions[2] = 1;
-            discreteActions[3] = 1;
-            discreteActions[4] = 0;
-            discreteActions[5] = 1; // Перезарядка
-            discreteActions[6] = 0;
+            sensor.AddObservation(0);
+            sensor.AddObservation(0);
+            sensor.AddObservation(0);
         }
-        if (Input.GetKey(KeyCode.UpArrow))
+        // 3
+
+        if (weapons.Any(w => w.WeaponType == Item.WeaponType.Grenade))
         {
-            discreteActions[0] = (int)walkPoint.x;
-            discreteActions[1] = (int)walkPoint.z;
-            discreteActions[2] = 2;
-            discreteActions[3] = 1;
-            discreteActions[4] = 0;
-            discreteActions[5] = 0;
-            discreteActions[6] = 0;
+            var grenade = weapons.Where(w => w.WeaponType == Item.WeaponType.Grenade).FirstOrDefault();
+            var grenadeMagAmmo = grenade.magCurrentAmmo;
+            var grenadeMaxMagAmmo = grenade.magMaxAmmo;
+            sensor.AddObservation(4);
+            sensor.AddObservation(grenadeMagAmmo / grenadeMaxMagAmmo);
         }
-        if (Input.GetKey(KeyCode.DownArrow))
+        else
         {
-            discreteActions[0] = (int)walkPoint.x;
-            discreteActions[1] = (int)walkPoint.z;
-            discreteActions[2] = 0;
-            discreteActions[3] = 1;
-            discreteActions[4] = 0;
-            discreteActions[5] = 0;
-            discreteActions[6] = 0;
+            sensor.AddObservation(0);
+            sensor.AddObservation(0);
         }
-        if ((Input.GetKey(KeyCode.LeftArrow)))
+        // 2
+
+        // Target
+        if (currentTarget) sensor.AddObservation(currentTarget.position);
+        else sensor.AddObservation(Vector3.zero);
+        // 3
+
+        sensor.AddObservation(distanceToTarget); // 1
+
+        if (lastKnownTargetTransform.position != null)
+            sensor.AddObservation(lastKnownTargetTransform.position); // 3
+        else sensor.AddObservation(Vector3.zero);
+
+        // Grenade
+        if (visibleGrenade) sensor.AddObservation(visibleGrenade.position);
+        else sensor.AddObservation(Vector3.zero);
+        // 3
+
+        sensor.AddObservation(distanceToGrenade); //1
+
+        // Item
+        sensor.AddObservation(weaponPointPistol); // 3
+        if (weaponPointPistol != Vector3.zero)
         {
-            discreteActions[0] = (int)walkPoint.x;
-            discreteActions[1] = (int)walkPoint.z;
-            discreteActions[2] = 1;
-            discreteActions[3] = 0;
-            discreteActions[4] = 0;
-            discreteActions[5] = 0;
-            discreteActions[6] = 0;
+            var pathLength = itemHelper.GetPathLength(path, transform.position, weaponPointPistol, navMeshAgent.areaMask);
+            sensor.AddObservation(pathLength);
         }
-        if ((Input.GetKey(KeyCode.RightArrow)))
+        else sensor.AddObservation(0); // 1
+
+        sensor.AddObservation(weaponPointRifle); // 3
+        if (weaponPointRifle != Vector3.zero)
         {
-            discreteActions[0] = (int)walkPoint.x;
-            discreteActions[1] = (int)walkPoint.z;
-            discreteActions[2] = 1;
-            discreteActions[3] = 2;
-            discreteActions[4] = 0;
-            discreteActions[5] = 0;
-            discreteActions[6] = 0;
+            var pathLength = itemHelper.GetPathLength(path, transform.position, weaponPointRifle, navMeshAgent.areaMask);
+            sensor.AddObservation(pathLength);
         }
+        else sensor.AddObservation(0); // 1
+
+        sensor.AddObservation(weaponPointGrenade); // 3
+        if (weaponPointGrenade != Vector3.zero)
+        {
+            var pathLength = itemHelper.GetPathLength(path, transform.position, weaponPointGrenade, navMeshAgent.areaMask);
+            sensor.AddObservation(pathLength);
+        }
+        else sensor.AddObservation(0); // 1
+
+        sensor.AddObservation(healthPackPoint); // 3
+        if (healthPackPoint != Vector3.zero)
+        {
+            var pathLength = itemHelper.GetPathLength(path, transform.position, healthPackPoint, navMeshAgent.areaMask);
+            sensor.AddObservation(pathLength);
+        }
+        else sensor.AddObservation(0); // 1
+
+        sensor.AddObservation(armorPackPoint); // 3
+        if (armorPackPoint != Vector3.zero)
+        {
+            var pathLength = itemHelper.GetPathLength(path, transform.position, armorPackPoint, navMeshAgent.areaMask);
+            sensor.AddObservation(pathLength);
+        }
+        else sensor.AddObservation(0); // 1
+
+        sensor.AddObservation(ammoPackPointPistol); // 3
+        if (ammoPackPointPistol != Vector3.zero)
+        {
+            var pathLength = itemHelper.GetPathLength(path, transform.position, ammoPackPointPistol, navMeshAgent.areaMask);
+            sensor.AddObservation(pathLength);
+        }
+        else sensor.AddObservation(0); // 1
+
+        sensor.AddObservation(ammoPackPointRifle); // 3
+        if (ammoPackPointRifle != Vector3.zero)
+        {
+            var pathLength = itemHelper.GetPathLength(path, transform.position, ammoPackPointRifle, navMeshAgent.areaMask);
+            sensor.AddObservation(pathLength);
+        }
+        else sensor.AddObservation(0); // 1
+
+        sensor.AddObservation(ammoPackPointGrenade); // 3
+        if (ammoPackPointGrenade != Vector3.zero)
+        {
+            var pathLength = itemHelper.GetPathLength(path, transform.position, ammoPackPointGrenade, navMeshAgent.areaMask);
+            sensor.AddObservation(pathLength);
+        }
+        else sensor.AddObservation(0); // 1
+
     }
 
     // Старт эпизода
     public override void OnEpisodeBegin()
     {
-        behaviorParameters = GetComponent<BehaviorParameters>();
-        behaviorParameters.TeamId = team;
-
-        if (isTrainingMode)
-        {
-            // заново спавнить врагов, предметы и тд
-        }
-
-        score = 0;
-        death = 0;
-
-        rigidbody = GetComponent<Rigidbody>();
-        // обнуляем скорость
-        rigidbody.linearVelocity = Vector3.zero;
-        rigidbody.angularVelocity = Vector3.zero;
-        // обнуляем поворот камеры по оси X
-        pointOfView.transform.rotation = Quaternion.Euler(0, rigidbody.rotation.y, 0);
-        walkPoint = transform.position;
-
-        // случайное место появления
-        //SpawnInRandomPosition();
+        StartCoroutine(Respawn());
     }
 
     // ML-Agents functions END
     // ======================================================================
 
-    protected virtual void Start()
+    IEnumerator Respawn()
     {
-        pointOfView = this.transform.Find("PointOfView");
-        rigidbody = GetComponent<Rigidbody>();
-        fieldOfView = pointOfView.GetComponent<FieldOfView>();
-        currentHealth = maxHealth;
+        navMeshAgent.isStopped = true;
 
-        // Настройка NavMeshAgent
-        navAgent = GetComponent<NavMeshAgent>();
-        //navAgent.angularSpeed = 0;
-        navAgent.speed = speed;
-        navAgent.angularSpeed = rotationSpeed;
+        yield return new WaitForSeconds(3f);
 
-        path = new NavMeshPath();
-        //playerTarget = GameObject.FindGameObjectWithTag("Player").transform;
+        SpawnHelper.SpawnInRandomPosition(this);
+        walkPoint = transform.position;
+        SpawnHelper.ResetState(this);
 
-        viewCamera = Camera.main;
-
-        weapons = new List<Weapon>() { gameObject.AddComponent<W_Crowbar>() };
-
-        currentWeapon = weapons[0];
+        ChangeLayerMask("Target");
+        navMeshAgent.isStopped = false;
     }
 
-    protected void Update()
+    void UpdateVisibleTarget()
     {
-        if (isDead) return;
-        fovPos = fieldOfView.transform.position;
-        fovForward = Quaternion.Inverse(fieldOfView.transform.localRotation) * Vector3.forward;
-
-        Debug.DrawRay(fovPos, fovForward * fieldOfView.viewRadius, Color.yellow);
-        RequestDecision();
-
         if (fieldOfView.visibleTargets.Count > 0)
         {
-            // TODO
+            currentTarget = fieldOfView.visibleTargets[0];
+            distanceToTarget = Vector3.Distance(currentTarget.position, transform.position);
 
-            isTargetVisible = true;
-            target = fieldOfView.visibleTargets[0];
-            lastKnownTargetPosition = target.position;
+            if (distanceToTarget > 0)
+            {
+                AddReward(1f / distanceToTarget);
+            }
         }
-        else if (fieldOfView.visibleTargets.Count == 0)
+        else
         {
-            isTargetVisible = false;
-            target = null;
+            currentTarget = null;
+            distanceToTarget = -1f;
         }
-
     }
 
-    public void _AddReward()
+    void UpdateVisibleGrenade()
     {
-        throw new NotImplementedException();
+        if (fieldOfView.visibleGrenades.Count > 0)
+        {
+            visibleGrenade = fieldOfView.visibleGrenades[0];
+            distanceToGrenade = Vector3.Distance(visibleGrenade.position, transform.position);
+        }
+        else
+        {
+            visibleGrenade = null;
+            distanceToGrenade = -1f;
+        }
+    }
+
+    private void Start()
+    {
+        Debug.Log("Agent initialized");
+        if (Academy.Instance.IsCommunicatorOn)
+            Debug.Log("Communicator is ON");
+    }
+
+    private void Update()
+    {
+        UpdateVisibleTarget();
+        UpdateVisibleGrenade();
+        fieldOfView.transform.rotation = transform.rotation;
+        Debug.DrawRay(fieldOfView.transform.position, fieldOfView.transform.forward * fieldOfView.viewRadius, Color.blue);
     }
 }
-
-*/
